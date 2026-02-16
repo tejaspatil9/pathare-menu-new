@@ -7,20 +7,22 @@ import CategoryBar from "@/components/menu/CategoryBar";
 import SearchBar from "@/components/menu/SearchBar";
 import AlcoholCard from "@/components/alcohol/AlcoholCard";
 
+interface AlcoholPrice {
+  id: string;
+  label: string;
+  price: number;
+}
+
 interface Alcohol {
   id: string;
   name: string;
   description: string | null;
   image_url: string | null;
-  is_bestseller: boolean;
+  is_bestseller: boolean | null;
   is_visible: boolean;
-  is_image_visible: boolean;
+  is_image_visible: boolean | null;
   category_id: string;
-  alcohol_prices: {
-    id: string;
-    label: string;
-    price: number;
-  }[];
+  alcohol_prices: AlcoholPrice[] | null;
 }
 
 interface AlcoholCategory {
@@ -40,7 +42,6 @@ export default function AlcoholMenuPage() {
     fetchAlcohol();
   }, []);
 
-  // 🔥 Fetch categories separately (important)
   const fetchCategories = async () => {
     const { data, error } = await supabase
       .from("alcohol_categories")
@@ -53,7 +54,7 @@ export default function AlcoholMenuPage() {
       return;
     }
 
-    if (data) setCategories(data);
+    setCategories(data || []);
   };
 
   const fetchAlcohol = async () => {
@@ -86,12 +87,11 @@ export default function AlcoholMenuPage() {
       return;
     }
 
-    if (data) setDrinks(data as Alcohol[]);
-
+    setDrinks((data || []) as Alcohol[]);
     setLoading(false);
   };
 
-  const filtered = drinks.filter((drink) => {
+  const filteredDrinks = drinks.filter((drink) => {
     const matchesSearch =
       drink.name?.toLowerCase().includes(search.toLowerCase());
 
@@ -108,6 +108,7 @@ export default function AlcoholMenuPage() {
   return (
     <div className="min-h-screen bg-[#f3e6d3] px-4 pb-10">
 
+      {/* Sticky Header */}
       <div className="sticky top-0 z-40 bg-[#f3e6d3] pt-6 pb-4">
 
         <h1 className="text-2xl font-semibold text-[#5a1f1f] mb-4">
@@ -126,6 +127,7 @@ export default function AlcoholMenuPage() {
         <SearchBar value={search} onChange={setSearch} />
       </div>
 
+      {/* Drinks List */}
       <div className="mt-6 flex flex-col gap-6">
 
         {loading && (
@@ -134,14 +136,14 @@ export default function AlcoholMenuPage() {
           </p>
         )}
 
-        {!loading && filtered.length === 0 && (
+        {!loading && filteredDrinks.length === 0 && (
           <p className="text-center text-[#5a1f1f]/70">
             No drinks available
           </p>
         )}
 
         {!loading &&
-          filtered.map((drink) => (
+          filteredDrinks.map((drink) => (
             <AlcoholCard
               key={drink.id}
               drink={{
@@ -151,11 +153,12 @@ export default function AlcoholMenuPage() {
                 image: drink.is_image_visible
                   ? drink.image_url || ""
                   : "",
-                isBestseller: drink.is_bestseller,
-                prices: drink.alcohol_prices?.map((p) => ({
-                  label: p.label,
-                  price: p.price,
-                })) || [],
+                isBestseller: Boolean(drink.is_bestseller),
+                prices:
+                  drink.alcohol_prices?.map((p) => ({
+                    label: p.label,
+                    price: p.price,
+                  })) || [],
               }}
             />
           ))}
