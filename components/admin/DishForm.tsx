@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { RESTAURANT_ID } from "@/lib/constants";
 
@@ -24,38 +24,65 @@ export default function DishForm({
   editingDish?: any;
   onSuccess: () => void;
 }) {
-  const [nameEn, setNameEn] = useState(editingDish?.name_en || "");
-  const [nameMr, setNameMr] = useState(editingDish?.name_mr || "");
-  const [descriptionEn, setDescriptionEn] = useState(
-    editingDish?.description_en || ""
-  );
-  const [descriptionMr, setDescriptionMr] = useState(
-    editingDish?.description_mr || ""
-  );
-  const [category, setCategory] = useState(editingDish?.category_id || "");
+
+  // 🔥 NORMAL STATE INIT
+  const [nameEn, setNameEn] = useState("");
+  const [nameMr, setNameMr] = useState("");
+  const [descriptionEn, setDescriptionEn] = useState("");
+  const [descriptionMr, setDescriptionMr] = useState("");
+  const [category, setCategory] = useState("");
   const [file, setFile] = useState<File | null>(null);
+  const [existingImage, setExistingImage] = useState<string | null>(null);
 
-  const [isVeg, setIsVeg] = useState(editingDish?.is_veg ?? true);
-  const [isChefSpecial, setIsChefSpecial] = useState(
-    editingDish?.is_chef_special ?? false
-  );
-  const [isPathareSpecial, setIsPathareSpecial] = useState(
-    editingDish?.is_pathare_special ?? false
-  );
-  const [isBestseller, setIsBestseller] = useState(
-    editingDish?.is_bestseller ?? false
-  );
+  const [isVeg, setIsVeg] = useState(true);
+  const [isChefSpecial, setIsChefSpecial] = useState(false);
+  const [isPathareSpecial, setIsPathareSpecial] = useState(false);
+  const [isBestseller, setIsBestseller] = useState(false);
 
-  const [prices, setPrices] = useState<Price[]>(
-    editingDish?.dish_prices || [
-      { label_en: "Full", label_mr: "पूर्ण", price: 0 },
-    ]
-  );
+  const [prices, setPrices] = useState<Price[]>([
+    { label_en: "Full", label_mr: "पूर्ण", price: 0 },
+  ]);
+
+  // 🔥 PREFILL WHEN EDITING
+  useEffect(() => {
+    if (editingDish) {
+      setNameEn(editingDish.name_en || "");
+      setNameMr(editingDish.name_mr || "");
+      setDescriptionEn(editingDish.description_en || "");
+      setDescriptionMr(editingDish.description_mr || "");
+      setCategory(editingDish.category_id || "");
+      setIsVeg(Boolean(editingDish.is_veg));
+      setIsChefSpecial(Boolean(editingDish.is_chef_special));
+      setIsPathareSpecial(Boolean(editingDish.is_pathare_special));
+      setIsBestseller(Boolean(editingDish.is_bestseller));
+      setExistingImage(editingDish.image_url || null);
+      setPrices(
+        editingDish.dish_prices?.length
+          ? editingDish.dish_prices
+          : [{ label_en: "", label_mr: "", price: 0 }]
+      );
+    }
+  }, [editingDish]);
+
+  const resetForm = () => {
+    setNameEn("");
+    setNameMr("");
+    setDescriptionEn("");
+    setDescriptionMr("");
+    setCategory("");
+    setFile(null);
+    setExistingImage(null);
+    setIsVeg(true);
+    setIsChefSpecial(false);
+    setIsPathareSpecial(false);
+    setIsBestseller(false);
+    setPrices([{ label_en: "Full", label_mr: "पूर्ण", price: 0 }]);
+  };
 
   const handleSubmit = async () => {
     if (!nameEn || !category) return;
 
-    let imageUrl = editingDish?.image_url || null;
+    let imageUrl = existingImage;
 
     if (file) {
       const formData = new FormData();
@@ -117,16 +144,21 @@ export default function DishForm({
     if (dishId) {
       await supabase.from("dish_prices").delete().eq("dish_id", dishId);
 
-      await supabase.from("dish_prices").insert(
-        prices.map((p) => ({
-          dish_id: dishId,
-          label_en: p.label_en,
-          label_mr: p.label_mr,
-          price: p.price,
-        }))
-      );
+      const validPrices = prices.filter((p) => p.price > 0);
+
+      if (validPrices.length) {
+        await supabase.from("dish_prices").insert(
+          validPrices.map((p) => ({
+            dish_id: dishId,
+            label_en: p.label_en || null,
+            label_mr: p.label_mr || null,
+            price: p.price,
+          }))
+        );
+      }
     }
 
+    resetForm();
     onSuccess();
   };
 
@@ -178,29 +210,30 @@ export default function DishForm({
         ))}
       </select>
 
+      {existingImage && (
+        <img
+          src={existingImage}
+          alt="Preview"
+          className="w-24 h-24 object-cover rounded border"
+        />
+      )}
+
       <input
         type="file"
         onChange={(e) => setFile(e.target.files?.[0] || null)}
       />
 
-      <div className="grid grid-cols-2 gap-2 text-sm">
-        <label><input type="checkbox" checked={isVeg} onChange={(e)=>setIsVeg(e.target.checked)} /> Veg</label>
-        <label><input type="checkbox" checked={isChefSpecial} onChange={(e)=>setIsChefSpecial(e.target.checked)} /> Chef Special</label>
-        <label><input type="checkbox" checked={isPathareSpecial} onChange={(e)=>setIsPathareSpecial(e.target.checked)} /> Pathare Special</label>
-        <label><input type="checkbox" checked={isBestseller} onChange={(e)=>setIsBestseller(e.target.checked)} /> Bestseller</label>
-      </div>
-
       <div className="border p-3 rounded-md space-y-2">
         <h3 className="text-sm font-medium">Prices</h3>
 
         {prices.map((p, i) => (
-          <div key={i} className="flex gap-2">
+          <div key={i} className="flex gap-2 items-center">
             <input
               placeholder="Label EN"
               value={p.label_en}
-              onChange={(e)=>{
-                const updated=[...prices];
-                updated[i].label_en=e.target.value;
+              onChange={(e) => {
+                const updated = [...prices];
+                updated[i].label_en = e.target.value;
                 setPrices(updated);
               }}
               className="border p-2 flex-1"
@@ -209,9 +242,9 @@ export default function DishForm({
             <input
               placeholder="Label MR"
               value={p.label_mr}
-              onChange={(e)=>{
-                const updated=[...prices];
-                updated[i].label_mr=e.target.value;
+              onChange={(e) => {
+                const updated = [...prices];
+                updated[i].label_mr = e.target.value;
                 setPrices(updated);
               }}
               className="border p-2 flex-1"
@@ -220,9 +253,9 @@ export default function DishForm({
             <input
               type="number"
               value={p.price}
-              onChange={(e)=>{
-                const updated=[...prices];
-                updated[i].price=Number(e.target.value);
+              onChange={(e) => {
+                const updated = [...prices];
+                updated[i].price = Number(e.target.value);
                 setPrices(updated);
               }}
               className="border p-2 w-24"
@@ -230,7 +263,9 @@ export default function DishForm({
 
             <button
               type="button"
-              onClick={()=>setPrices(prices.filter((_,idx)=>idx!==i))}
+              onClick={() =>
+                setPrices(prices.filter((_, idx) => idx !== i))
+              }
               className="text-red-500"
             >
               ✕
@@ -240,7 +275,9 @@ export default function DishForm({
 
         <button
           type="button"
-          onClick={()=>setPrices([...prices,{label_en:"",label_mr:"",price:0}])}
+          onClick={() =>
+            setPrices([...prices, { label_en: "", label_mr: "", price: 0 }])
+          }
           className="text-blue-600 text-sm"
         >
           + Add Price
