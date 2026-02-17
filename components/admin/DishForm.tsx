@@ -24,13 +24,12 @@ export default function DishForm({
   editingDish?: any;
   onSuccess: () => void;
 }) {
-
-  // 🔥 NORMAL STATE INIT
   const [nameEn, setNameEn] = useState("");
   const [nameMr, setNameMr] = useState("");
   const [descriptionEn, setDescriptionEn] = useState("");
   const [descriptionMr, setDescriptionMr] = useState("");
   const [category, setCategory] = useState("");
+
   const [file, setFile] = useState<File | null>(null);
   const [existingImage, setExistingImage] = useState<string | null>(null);
 
@@ -40,10 +39,11 @@ export default function DishForm({
   const [isBestseller, setIsBestseller] = useState(false);
 
   const [prices, setPrices] = useState<Price[]>([
-    { label_en: "Full", label_mr: "पूर्ण", price: 0 },
+    { label_en: "", label_mr: "", price: 0 },
   ]);
 
-  // 🔥 PREFILL WHEN EDITING
+  /* ================= PREFILL WHEN EDITING ================= */
+
   useEffect(() => {
     if (editingDish) {
       setNameEn(editingDish.name_en || "");
@@ -51,11 +51,14 @@ export default function DishForm({
       setDescriptionEn(editingDish.description_en || "");
       setDescriptionMr(editingDish.description_mr || "");
       setCategory(editingDish.category_id || "");
+
       setIsVeg(Boolean(editingDish.is_veg));
       setIsChefSpecial(Boolean(editingDish.is_chef_special));
       setIsPathareSpecial(Boolean(editingDish.is_pathare_special));
       setIsBestseller(Boolean(editingDish.is_bestseller));
+
       setExistingImage(editingDish.image_url || null);
+
       setPrices(
         editingDish.dish_prices?.length
           ? editingDish.dish_prices
@@ -63,6 +66,8 @@ export default function DishForm({
       );
     }
   }, [editingDish]);
+
+  /* ================= RESET FORM ================= */
 
   const resetForm = () => {
     setNameEn("");
@@ -72,12 +77,16 @@ export default function DishForm({
     setCategory("");
     setFile(null);
     setExistingImage(null);
+
     setIsVeg(true);
     setIsChefSpecial(false);
     setIsPathareSpecial(false);
     setIsBestseller(false);
-    setPrices([{ label_en: "Full", label_mr: "पूर्ण", price: 0 }]);
+
+    setPrices([{ label_en: "", label_mr: "", price: 0 }]);
   };
+
+  /* ================= SUBMIT ================= */
 
   const handleSubmit = async () => {
     if (!nameEn || !category) return;
@@ -141,6 +150,8 @@ export default function DishForm({
       dishId = data?.id;
     }
 
+    /* ================= SAVE PRICES ================= */
+
     if (dishId) {
       await supabase.from("dish_prices").delete().eq("dish_id", dishId);
 
@@ -162,9 +173,10 @@ export default function DishForm({
     onSuccess();
   };
 
+  /* ================= UI ================= */
+
   return (
     <div className="border p-6 rounded-md space-y-4">
-
       <h2 className="font-semibold">
         {editingDish ? "Edit Dish" : "Add Dish"}
       </h2>
@@ -210,6 +222,7 @@ export default function DishForm({
         ))}
       </select>
 
+      {/* IMAGE */}
       {existingImage && (
         <img
           src={existingImage}
@@ -223,28 +236,26 @@ export default function DishForm({
         onChange={(e) => setFile(e.target.files?.[0] || null)}
       />
 
+      {/* TAG CHECKBOXES */}
+      <div className="grid grid-cols-2 gap-3 text-sm">
+        <label><input type="checkbox" checked={isVeg} onChange={(e)=>setIsVeg(e.target.checked)} /> Veg</label>
+        <label><input type="checkbox" checked={isChefSpecial} onChange={(e)=>setIsChefSpecial(e.target.checked)} /> Chef Special</label>
+        <label><input type="checkbox" checked={isPathareSpecial} onChange={(e)=>setIsPathareSpecial(e.target.checked)} /> Pathare Special</label>
+        <label><input type="checkbox" checked={isBestseller} onChange={(e)=>setIsBestseller(e.target.checked)} /> Bestseller</label>
+      </div>
+
+      {/* PRICES */}
       <div className="border p-3 rounded-md space-y-2">
         <h3 className="text-sm font-medium">Prices</h3>
 
         {prices.map((p, i) => (
           <div key={i} className="flex gap-2 items-center">
             <input
-              placeholder="Label EN"
+              placeholder="Label EN (optional)"
               value={p.label_en}
-              onChange={(e) => {
-                const updated = [...prices];
-                updated[i].label_en = e.target.value;
-                setPrices(updated);
-              }}
-              className="border p-2 flex-1"
-            />
-
-            <input
-              placeholder="Label MR"
-              value={p.label_mr}
-              onChange={(e) => {
-                const updated = [...prices];
-                updated[i].label_mr = e.target.value;
+              onChange={(e)=>{
+                const updated=[...prices];
+                updated[i].label_en=e.target.value;
                 setPrices(updated);
               }}
               className="border p-2 flex-1"
@@ -253,41 +264,38 @@ export default function DishForm({
             <input
               type="number"
               value={p.price}
-              onChange={(e) => {
-                const updated = [...prices];
-                updated[i].price = Number(e.target.value);
+              onChange={(e)=>{
+                const updated=[...prices];
+                updated[i].price=Number(e.target.value);
                 setPrices(updated);
               }}
               className="border p-2 w-24"
             />
 
-            <button
-              type="button"
-              onClick={() =>
-                setPrices(prices.filter((_, idx) => idx !== i))
-              }
-              className="text-red-500"
-            >
-              ✕
-            </button>
+            {prices.length > 1 && (
+              <button
+                type="button"
+                onClick={()=>setPrices(prices.filter((_,idx)=>idx!==i))}
+                className="text-red-500"
+              >
+                ✕
+              </button>
+            )}
           </div>
         ))}
 
         <button
           type="button"
-          onClick={() =>
-            setPrices([...prices, { label_en: "", label_mr: "", price: 0 }])
-          }
+          onClick={()=>setPrices([...prices,{label_en:"",label_mr:"",price:0}])}
           className="text-blue-600 text-sm"
         >
           + Add Price
         </button>
       </div>
 
-      <button onClick={handleSubmit} className="border p-2">
+      <button onClick={handleSubmit} className="border p-2 w-full">
         {editingDish ? "Update Dish" : "Add Dish"}
       </button>
-
     </div>
   );
 }
