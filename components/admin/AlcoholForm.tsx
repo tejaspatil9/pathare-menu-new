@@ -5,7 +5,7 @@ import { supabase } from "@/lib/supabase";
 import { RESTAURANT_ID } from "@/lib/constants";
 
 interface Price {
-  label: string;
+  label?: string | null;
   price: number;
 }
 
@@ -27,8 +27,9 @@ export default function AlcoholForm({
   const [file, setFile] = useState<File | null>(null);
   const [existingImage, setExistingImage] = useState<string | null>(null);
 
+  // 🔥 default = empty label for single price support
   const [prices, setPrices] = useState<Price[]>([
-    { label: "30ml", price: 0 }
+    { label: "", price: 0 }
   ]);
 
   const [isBestseller, setIsBestseller] = useState(false);
@@ -48,8 +49,10 @@ export default function AlcoholForm({
       setIsImageVisible(Boolean(editingDrink.is_image_visible));
       setExistingImage(editingDrink.image_url || null);
 
-      if (editingDrink.alcohol_prices?.length) {
+      if (editingDrink.alcohol_prices?.length > 0) {
         setPrices(editingDrink.alcohol_prices);
+      } else {
+        setPrices([{ label: "", price: 0 }]);
       }
     }
   }, [editingDrink]);
@@ -60,16 +63,17 @@ export default function AlcoholForm({
     setSelectedCategory("");
     setFile(null);
     setExistingImage(null);
-    setPrices([{ label: "30ml", price: 0 }]);
+    setPrices([{ label: "", price: 0 }]);
     setIsBestseller(false);
     setIsVisible(true);
     setIsImageVisible(true);
   };
 
   const handleSubmit = async () => {
+
     let imageUrl = existingImage;
 
-    // Upload new image only if selected
+    // Upload new image if selected
     if (file) {
       const formData = new FormData();
       formData.append("file", file);
@@ -118,22 +122,28 @@ export default function AlcoholForm({
       alcoholId = data?.id;
     }
 
-    // Replace prices
+    // 🔥 Replace prices correctly
     if (alcoholId) {
+
       await supabase
         .from("alcohol_prices")
         .delete()
         .eq("alcohol_id", alcoholId);
 
-      await supabase.from("alcohol_prices").insert(
-        prices
-          .filter((p) => p.label.trim() !== "")
-          .map((p) => ({
-            alcohol_id: alcoholId,
-            label: p.label,
-            price: p.price,
-          }))
-      );
+      const validPrices = prices
+        .filter((p) => p.price && Number(p.price) > 0) // only valid numbers
+        .map((p) => ({
+          alcohol_id: alcoholId,
+          label:
+            !p.label || p.label.trim() === ""
+              ? null   // 🔥 single price support
+              : p.label.trim(),
+          price: Number(p.price),
+        }));
+
+      if (validPrices.length > 0) {
+        await supabase.from("alcohol_prices").insert(validPrices);
+      }
     }
 
     setMessage("Saved Successfully ✅");
@@ -177,10 +187,10 @@ export default function AlcoholForm({
         ))}
       </select>
 
-      {/* 🔥 IMAGE SECTION */}
+      {/* Image preview when editing */}
       {existingImage && (
-        <div className="space-y-2">
-          <div className="text-sm text-gray-600">Current Image:</div>
+        <div>
+          <div className="text-sm text-gray-600">Current Image</div>
           <img
             src={existingImage}
             alt="preview"
@@ -198,16 +208,18 @@ export default function AlcoholForm({
       <div className="space-y-2">
         {prices.map((p, i) => (
           <div key={i} className="flex gap-2 items-center">
+
             <input
-              value={p.label}
+              value={p.label || ""}
               onChange={(e) => {
                 const updated = [...prices];
                 updated[i].label = e.target.value;
                 setPrices(updated);
               }}
               className="border p-2 flex-1"
-              placeholder="Label"
+              placeholder="Label (optional)"
             />
+
             <input
               type="number"
               value={p.price}
@@ -249,8 +261,7 @@ export default function AlcoholForm({
             type="checkbox"
             checked={isBestseller}
             onChange={(e) => setIsBestseller(e.target.checked)}
-          />{" "}
-          Bestseller
+          /> Bestseller
         </label>
 
         <label>
@@ -258,8 +269,7 @@ export default function AlcoholForm({
             type="checkbox"
             checked={isVisible}
             onChange={(e) => setIsVisible(e.target.checked)}
-          />{" "}
-          Visible
+          /> Visible
         </label>
 
         <label>
@@ -267,8 +277,7 @@ export default function AlcoholForm({
             type="checkbox"
             checked={isImageVisible}
             onChange={(e) => setIsImageVisible(e.target.checked)}
-          />{" "}
-          Image Visible
+          /> Image Visible
         </label>
       </div>
 
