@@ -40,12 +40,17 @@ export default function DishList({
     onRefresh();
   };
 
+  // 🔥 SORT ALPHABETICALLY (A → Z)
+  const sortedDishes = [...dishes].sort((a, b) =>
+    a.name_en.localeCompare(b.name_en, undefined, { sensitivity: "base" })
+  );
+
   return (
     <div className="border p-6 rounded-md space-y-4">
 
       <h2 className="font-semibold">Dish List</h2>
 
-      {dishes.map((dish) => (
+      {sortedDishes.map((dish) => (
         <div
           key={dish.id}
           className="border p-3 flex justify-between items-center"

@@ -18,7 +18,11 @@ export default function AlcoholList({
   drinks,
   onRefresh,
   onEdit,
-}: any) {
+}: {
+  drinks: Drink[];
+  onRefresh: () => void;
+  onEdit: (drink: Drink) => void;
+}) {
 
   const toggleVisibility = async (drink: Drink) => {
     await supabase
@@ -43,24 +47,36 @@ export default function AlcoholList({
     onRefresh();
   };
 
+  // 🔥 SORT ALPHABETICALLY (A → Z)
+  const sortedDrinks = [...drinks].sort((a, b) =>
+    a.name.localeCompare(b.name, undefined, { sensitivity: "base" })
+  );
+
   return (
     <div className="border p-4 rounded space-y-3">
       <h2 className="font-semibold">Alcohol List</h2>
 
-      {drinks.map((drink: Drink) => (
-        <div key={drink.id} className="border p-3 flex justify-between items-center">
-
+      {sortedDrinks.map((drink) => (
+        <div
+          key={drink.id}
+          className="border p-3 flex justify-between items-center"
+        >
           <div>
             <p className="font-medium">
               {drink.name}
               {!drink.is_visible && (
-                <span className="text-red-500 text-xs ml-2">(Hidden)</span>
+                <span className="text-red-500 text-xs ml-2">
+                  (Hidden)
+                </span>
               )}
             </p>
 
-            <div className="flex gap-2 mt-1">
+            <div className="flex gap-2 mt-1 flex-wrap">
               {drink.alcohol_prices.map((p) => (
-                <span key={p.id} className="text-xs bg-gray-200 px-2 py-1 rounded">
+                <span
+                  key={p.id}
+                  className="text-xs bg-gray-200 px-2 py-1 rounded"
+                >
                   {p.label} ₹{p.price}
                 </span>
               ))}
@@ -68,20 +84,34 @@ export default function AlcoholList({
           </div>
 
           <div className="flex gap-2 text-xs">
-            <button onClick={() => onEdit(drink)} className="border px-2">
+            <button
+              onClick={() => onEdit(drink)}
+              className="border px-2"
+            >
               Edit
             </button>
-            <button onClick={() => toggleVisibility(drink)} className="border px-2">
+
+            <button
+              onClick={() => toggleVisibility(drink)}
+              className="border px-2"
+            >
               {drink.is_visible ? "Hide" : "Unhide"}
             </button>
-            <button onClick={() => toggleImage(drink)} className="border px-2">
+
+            <button
+              onClick={() => toggleImage(drink)}
+              className="border px-2"
+            >
               Image {drink.is_image_visible ? "Off" : "On"}
             </button>
-            <button onClick={() => deleteDrink(drink.id)} className="border px-2 text-red-600">
+
+            <button
+              onClick={() => deleteDrink(drink.id)}
+              className="border px-2 text-red-600"
+            >
               Delete
             </button>
           </div>
-
         </div>
       ))}
     </div>
