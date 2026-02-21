@@ -8,6 +8,7 @@ interface Category {
   id: string;
   name_en: string;
   name_mr: string;
+  display_order: number;
 }
 
 export default function CategoryManager({
@@ -21,14 +22,25 @@ export default function CategoryManager({
   const [nameEn, setNameEn] = useState("");
   const [nameMr, setNameMr] = useState("");
 
+  // Always work with ordered list
+  const sortedCategories = [...categories].sort(
+    (a, b) => a.display_order - b.display_order
+  );
+
   const handleAdd = async () => {
-    if (!nameEn) return;
+    if (!nameEn.trim()) return;
+
+    const maxOrder =
+      sortedCategories.length > 0
+        ? Math.max(...sortedCategories.map(c => c.display_order))
+        : 0;
 
     await supabase.from("categories").insert([
       {
         restaurant_id: RESTAURANT_ID,
         name_en: nameEn,
         name_mr: nameMr,
+        display_order: maxOrder + 1,
       },
     ]);
 
@@ -39,6 +51,36 @@ export default function CategoryManager({
 
   const handleDelete = async (id: string) => {
     await supabase.from("categories").delete().eq("id", id);
+    onRefresh();
+  };
+
+  const moveCategory = async (
+    category: Category,
+    direction: "up" | "down"
+  ) => {
+
+    const index = sortedCategories.findIndex(
+      (c) => c.id === category.id
+    );
+
+    const swapWith =
+      direction === "up"
+        ? sortedCategories[index - 1]
+        : sortedCategories[index + 1];
+
+    if (!swapWith) return;
+
+    // Swap order values
+    await supabase
+      .from("categories")
+      .update({ display_order: swapWith.display_order })
+      .eq("id", category.id);
+
+    await supabase
+      .from("categories")
+      .update({ display_order: category.display_order })
+      .eq("id", swapWith.id);
+
     onRefresh();
   };
 
@@ -70,7 +112,7 @@ export default function CategoryManager({
         </button>
       </div>
 
-      {categories.map((cat) => (
+      {sortedCategories.map((cat, index) => (
         <div
           key={cat.id}
           className="flex justify-between items-center border p-2"
@@ -79,12 +121,32 @@ export default function CategoryManager({
             {cat.name_en} / {cat.name_mr}
           </span>
 
-          <button
-            onClick={() => handleDelete(cat.id)}
-            className="border px-2 text-red-600 text-xs"
-          >
-            Delete
-          </button>
+          <div className="flex gap-2 items-center">
+
+            <button
+              disabled={index === 0}
+              onClick={() => moveCategory(cat, "up")}
+              className="border px-2 text-xs"
+            >
+              ↑
+            </button>
+
+            <button
+              disabled={index === sortedCategories.length - 1}
+              onClick={() => moveCategory(cat, "down")}
+              className="border px-2 text-xs"
+            >
+              ↓
+            </button>
+
+            <button
+              onClick={() => handleDelete(cat.id)}
+              className="border px-2 text-red-600 text-xs"
+            >
+              Delete
+            </button>
+
+          </div>
         </div>
       ))}
 

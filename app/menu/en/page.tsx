@@ -10,6 +10,7 @@ import DishCard from "@/components/menu/DishCard";
 interface Category {
   id: string;
   name_en: string;
+  display_order: number;
 }
 
 interface Dish {
@@ -21,7 +22,9 @@ interface Dish {
   is_chef_special: boolean;
   is_pathare_special: boolean;
   is_bestseller: boolean;
+  is_visible: boolean;
   category_id: string;
+  display_order: number;
   dish_prices: {
     label_en: string;
     price: number;
@@ -34,13 +37,14 @@ export default function FoodMenuPage() {
   const [activeCategory, setActiveCategory] = useState("All");
   const [search, setSearch] = useState("");
 
-  // 🔥 Fetch Categories
+  // ✅ Fetch Categories (ordered)
   useEffect(() => {
     const fetchCategories = async () => {
       const { data } = await supabase
         .from("categories")
-        .select("id, name_en")
-        .eq("restaurant_id", RESTAURANT_ID);
+        .select("id, name_en, display_order")
+        .eq("restaurant_id", RESTAURANT_ID)
+        .order("display_order", { ascending: true });
 
       if (data) {
         setCategories(data);
@@ -50,19 +54,31 @@ export default function FoodMenuPage() {
     fetchCategories();
   }, []);
 
-  // 🔥 Fetch Dishes + Prices
+  // ✅ Fetch Dishes (ordered + visible only)
   useEffect(() => {
     const fetchDishes = async () => {
       const { data } = await supabase
         .from("dishes")
         .select(`
-          *,
+          id,
+          name_en,
+          description_en,
+          image_url,
+          is_veg,
+          is_chef_special,
+          is_pathare_special,
+          is_bestseller,
+          is_visible,
+          category_id,
+          display_order,
           dish_prices (
             label_en,
             price
           )
         `)
-        .eq("restaurant_id", RESTAURANT_ID);
+        .eq("restaurant_id", RESTAURANT_ID)
+        .eq("is_visible", true)
+        .order("display_order", { ascending: true });
 
       if (data) {
         setDishes(data);
@@ -72,7 +88,7 @@ export default function FoodMenuPage() {
     fetchDishes();
   }, []);
 
-  // 🔥 Filter Logic
+  // ✅ Filter Logic (preserves DB ordering)
   const filtered = dishes.filter((dish) => {
     const matchesSearch = dish.name_en
       .toLowerCase()

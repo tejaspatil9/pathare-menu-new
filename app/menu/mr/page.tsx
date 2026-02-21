@@ -10,6 +10,7 @@ import DishCard from "@/components/menu/DishCard";
 interface Category {
   id: string;
   name_mr: string;
+  display_order: number;
 }
 
 interface DishFromDB {
@@ -23,6 +24,7 @@ interface DishFromDB {
   is_bestseller: boolean | null;
   is_visible: boolean;
   category_id: string;
+  display_order: number;
   dish_prices: {
     label_mr: string;
     price: number;
@@ -36,14 +38,14 @@ export default function MarathiMenuPage() {
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
 
-  // 🔥 Fetch Categories (Marathi)
+  // ✅ Fetch Categories (ordered by display_order)
   useEffect(() => {
     const fetchCategories = async () => {
       const { data, error } = await supabase
         .from("categories")
-        .select("id, name_mr")
+        .select("id, name_mr, display_order")
         .eq("restaurant_id", RESTAURANT_ID)
-        .order("name_mr", { ascending: true });
+        .order("display_order", { ascending: true });
 
       if (error) {
         console.error("Category fetch error:", error);
@@ -56,7 +58,7 @@ export default function MarathiMenuPage() {
     fetchCategories();
   }, []);
 
-  // 🔥 Fetch Visible Dishes Only
+  // ✅ Fetch Visible Dishes (ordered by display_order)
   useEffect(() => {
     const fetchDishes = async () => {
       setLoading(true);
@@ -64,15 +66,25 @@ export default function MarathiMenuPage() {
       const { data, error } = await supabase
         .from("dishes")
         .select(`
-          *,
+          id,
+          name_mr,
+          description_mr,
+          image_url,
+          is_veg,
+          is_chef_special,
+          is_pathare_special,
+          is_bestseller,
+          is_visible,
+          category_id,
+          display_order,
           dish_prices (
             label_mr,
             price
           )
         `)
         .eq("restaurant_id", RESTAURANT_ID)
-        .eq("is_visible", true) // 🔥 hide/unhide support
-        .order("created_at", { ascending: false });
+        .eq("is_visible", true)
+        .order("display_order", { ascending: true });
 
       if (error) {
         console.error("Dish fetch error:", error);
@@ -88,7 +100,7 @@ export default function MarathiMenuPage() {
     fetchDishes();
   }, []);
 
-  // 🔥 Filtering
+  // ✅ Filtering (DB order preserved)
   const filteredDishes = dishes.filter((dish) => {
 
     const matchesSearch =

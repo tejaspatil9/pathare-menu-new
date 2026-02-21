@@ -7,6 +7,8 @@ interface Dish {
   name_en: string;
   name_mr: string;
   is_visible: boolean;
+  display_order: number;
+  category_id: string;
   dish_prices: {
     id: string;
     label_en: string;
@@ -25,6 +27,11 @@ export default function DishList({
   onEdit: (dish: Dish) => void;
 }) {
 
+  // Always work on ordered list
+  const sortedDishes = [...dishes].sort(
+    (a, b) => a.display_order - b.display_order
+  );
+
   const toggleVisibility = async (dish: Dish) => {
     await supabase
       .from("dishes")
@@ -40,17 +47,42 @@ export default function DishList({
     onRefresh();
   };
 
-  // 🔥 SORT ALPHABETICALLY (A → Z)
-  const sortedDishes = [...dishes].sort((a, b) =>
-    a.name_en.localeCompare(b.name_en, undefined, { sensitivity: "base" })
-  );
+  const moveDish = async (
+    dish: Dish,
+    direction: "up" | "down"
+  ) => {
+
+    const index = sortedDishes.findIndex(
+      (d) => d.id === dish.id
+    );
+
+    const swapWith =
+      direction === "up"
+        ? sortedDishes[index - 1]
+        : sortedDishes[index + 1];
+
+    if (!swapWith) return;
+
+    // Swap order values safely
+    await supabase
+      .from("dishes")
+      .update({ display_order: swapWith.display_order })
+      .eq("id", dish.id);
+
+    await supabase
+      .from("dishes")
+      .update({ display_order: dish.display_order })
+      .eq("id", swapWith.id);
+
+    onRefresh();
+  };
 
   return (
     <div className="border p-6 rounded-md space-y-4">
 
       <h2 className="font-semibold">Dish List</h2>
 
-      {sortedDishes.map((dish) => (
+      {sortedDishes.map((dish, index) => (
         <div
           key={dish.id}
           className="border p-3 flex justify-between items-center"
@@ -79,7 +111,24 @@ export default function DishList({
 
           </div>
 
-          <div className="flex gap-2 text-xs">
+          <div className="flex gap-2 text-xs items-center">
+
+            <button
+              disabled={index === 0}
+              onClick={() => moveDish(dish, "up")}
+              className="border px-2"
+            >
+              ↑
+            </button>
+
+            <button
+              disabled={index === sortedDishes.length - 1}
+              onClick={() => moveDish(dish, "down")}
+              className="border px-2"
+            >
+              ↓
+            </button>
+
             <button
               onClick={() => onEdit(dish)}
               className="border px-2"
@@ -100,10 +149,11 @@ export default function DishList({
             >
               Delete
             </button>
-          </div>
 
+          </div>
         </div>
       ))}
+
     </div>
   );
 }
