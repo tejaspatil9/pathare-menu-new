@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { uploadToR2 } from "@/lib/r2";
 
+export const runtime = "nodejs"; // ✅ REQUIRED
+
 const MAX_FILE_SIZE = 1 * 1024 * 1024; // 1MB
 
 export async function POST(req: NextRequest) {
@@ -16,7 +18,6 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // ✅ File size check (1MB limit)
     if (file.size > MAX_FILE_SIZE) {
       return NextResponse.json(
         { error: "Image must be under 1MB" },
@@ -24,7 +25,6 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // ✅ Ensure it is an image
     if (!file.type.startsWith("image/")) {
       return NextResponse.json(
         { error: "Only image files are allowed" },
@@ -33,6 +33,13 @@ export async function POST(req: NextRequest) {
     }
 
     const imageUrl = await uploadToR2(file, type);
+
+    if (!imageUrl) {
+      return NextResponse.json(
+        { error: "Upload failed - No URL returned" },
+        { status: 500 }
+      );
+    }
 
     return NextResponse.json({ url: imageUrl });
 

@@ -15,6 +15,8 @@ interface Price {
   price: number;
 }
 
+const MAX_FILE_SIZE = 1024 * 1024;
+
 export default function DishForm({
   categories,
   editingDish,
@@ -42,7 +44,7 @@ export default function DishForm({
     { label_en: "", label_mr: "", price: 0 },
   ]);
 
-  /* ================= PREFILL WHEN EDITING ================= */
+  /* ================= PREFILL ================= */
 
   useEffect(() => {
     if (editingDish) {
@@ -51,12 +53,10 @@ export default function DishForm({
       setDescriptionEn(editingDish.description_en || "");
       setDescriptionMr(editingDish.description_mr || "");
       setCategory(editingDish.category_id || "");
-
       setIsVeg(Boolean(editingDish.is_veg));
       setIsChefSpecial(Boolean(editingDish.is_chef_special));
       setIsPathareSpecial(Boolean(editingDish.is_pathare_special));
       setIsBestseller(Boolean(editingDish.is_bestseller));
-
       setExistingImage(editingDish.image_url || null);
 
       setPrices(
@@ -67,7 +67,28 @@ export default function DishForm({
     }
   }, [editingDish]);
 
-  /* ================= RESET FORM ================= */
+  /* ================= FILE VALIDATION ================= */
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const selected = e.target.files?.[0];
+    if (!selected) return;
+
+    if (selected.size > MAX_FILE_SIZE) {
+      alert("Image must be under 1MB");
+      e.target.value = "";
+      return;
+    }
+
+    if (!selected.type.startsWith("image/")) {
+      alert("Only image files allowed");
+      e.target.value = "";
+      return;
+    }
+
+    setFile(selected);
+  };
+
+  /* ================= RESET ================= */
 
   const resetForm = () => {
     setNameEn("");
@@ -77,19 +98,20 @@ export default function DishForm({
     setCategory("");
     setFile(null);
     setExistingImage(null);
-
     setIsVeg(true);
     setIsChefSpecial(false);
     setIsPathareSpecial(false);
     setIsBestseller(false);
-
     setPrices([{ label_en: "", label_mr: "", price: 0 }]);
   };
 
   /* ================= SUBMIT ================= */
 
   const handleSubmit = async () => {
-    if (!nameEn || !category) return;
+    if (!nameEn || !category) {
+      alert("Name and category required");
+      return;
+    }
 
     let imageUrl = existingImage;
 
@@ -103,6 +125,12 @@ export default function DishForm({
         body: formData,
       });
 
+      if (!res.ok) {
+        const err = await res.json();
+        alert(err.error || "Upload failed");
+        return;
+      }
+
       const data = await res.json();
       imageUrl = data.url;
     }
@@ -110,7 +138,7 @@ export default function DishForm({
     let dishId = editingDish?.id;
 
     if (editingDish) {
-      await supabase
+      const { error } = await supabase
         .from("dishes")
         .update({
           name_en: nameEn,
@@ -125,8 +153,13 @@ export default function DishForm({
           is_bestseller: isBestseller,
         })
         .eq("id", dishId);
+
+      if (error) {
+        alert(error.message);
+        return;
+      }
     } else {
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from("dishes")
         .insert([
           {
@@ -146,6 +179,11 @@ export default function DishForm({
         ])
         .select()
         .single();
+
+      if (error) {
+        alert(error.message);
+        return;
+      }
 
       dishId = data?.id;
     }
@@ -181,36 +219,29 @@ export default function DishForm({
         {editingDish ? "Edit Dish" : "Add Dish"}
       </h2>
 
-      <input
-        placeholder="Name EN"
-        value={nameEn}
+      <input placeholder="Name EN" value={nameEn}
         onChange={(e) => setNameEn(e.target.value)}
         className="border p-2 w-full"
       />
 
-      <input
-        placeholder="Name MR"
-        value={nameMr}
+      <input placeholder="Name MR" value={nameMr}
         onChange={(e) => setNameMr(e.target.value)}
         className="border p-2 w-full"
       />
 
-      <textarea
-        placeholder="Description EN"
+      <textarea placeholder="Description EN"
         value={descriptionEn}
         onChange={(e) => setDescriptionEn(e.target.value)}
         className="border p-2 w-full"
       />
 
-      <textarea
-        placeholder="Description MR"
+      <textarea placeholder="Description MR"
         value={descriptionMr}
         onChange={(e) => setDescriptionMr(e.target.value)}
         className="border p-2 w-full"
       />
 
-      <select
-        value={category}
+      <select value={category}
         onChange={(e) => setCategory(e.target.value)}
         className="border p-2 w-full"
       >
@@ -222,26 +253,24 @@ export default function DishForm({
         ))}
       </select>
 
-      {/* IMAGE */}
       {existingImage && (
-        <img
-          src={existingImage}
-          alt="Preview"
+        <img src={existingImage} alt="Preview"
           className="w-24 h-24 object-cover rounded border"
         />
       )}
 
-      <input
-        type="file"
-        onChange={(e) => setFile(e.target.files?.[0] || null)}
-      />
+      <input type="file" onChange={handleFileChange} />
 
-      {/* TAG CHECKBOXES */}
+      {/* TAGS */}
       <div className="grid grid-cols-2 gap-3 text-sm">
-        <label><input type="checkbox" checked={isVeg} onChange={(e)=>setIsVeg(e.target.checked)} /> Veg</label>
-        <label><input type="checkbox" checked={isChefSpecial} onChange={(e)=>setIsChefSpecial(e.target.checked)} /> Chef Special</label>
-        <label><input type="checkbox" checked={isPathareSpecial} onChange={(e)=>setIsPathareSpecial(e.target.checked)} /> Pathare Special</label>
-        <label><input type="checkbox" checked={isBestseller} onChange={(e)=>setIsBestseller(e.target.checked)} /> Bestseller</label>
+        <label><input type="checkbox" checked={isVeg}
+          onChange={(e)=>setIsVeg(e.target.checked)} /> Veg</label>
+        <label><input type="checkbox" checked={isChefSpecial}
+          onChange={(e)=>setIsChefSpecial(e.target.checked)} /> Chef Special</label>
+        <label><input type="checkbox" checked={isPathareSpecial}
+          onChange={(e)=>setIsPathareSpecial(e.target.checked)} /> Pathare Special</label>
+        <label><input type="checkbox" checked={isBestseller}
+          onChange={(e)=>setIsBestseller(e.target.checked)} /> Bestseller</label>
       </div>
 
       {/* PRICES */}
@@ -250,8 +279,7 @@ export default function DishForm({
 
         {prices.map((p, i) => (
           <div key={i} className="flex gap-2 items-center">
-            <input
-              placeholder="Label EN (optional)"
+            <input placeholder="Label EN"
               value={p.label_en}
               onChange={(e)=>{
                 const updated=[...prices];
@@ -260,9 +288,16 @@ export default function DishForm({
               }}
               className="border p-2 flex-1"
             />
-
-            <input
-              type="number"
+            <input placeholder="Label MR"
+              value={p.label_mr}
+              onChange={(e)=>{
+                const updated=[...prices];
+                updated[i].label_mr=e.target.value;
+                setPrices(updated);
+              }}
+              className="border p-2 flex-1"
+            />
+            <input type="number"
               value={p.price}
               onChange={(e)=>{
                 const updated=[...prices];
@@ -271,21 +306,16 @@ export default function DishForm({
               }}
               className="border p-2 w-24"
             />
-
             {prices.length > 1 && (
-              <button
-                type="button"
+              <button type="button"
                 onClick={()=>setPrices(prices.filter((_,idx)=>idx!==i))}
                 className="text-red-500"
-              >
-                ✕
-              </button>
+              >✕</button>
             )}
           </div>
         ))}
 
-        <button
-          type="button"
+        <button type="button"
           onClick={()=>setPrices([...prices,{label_en:"",label_mr:"",price:0}])}
           className="text-blue-600 text-sm"
         >
@@ -293,7 +323,8 @@ export default function DishForm({
         </button>
       </div>
 
-      <button onClick={handleSubmit} className="border p-2 w-full">
+      <button onClick={handleSubmit}
+        className="border p-2 w-full">
         {editingDish ? "Update Dish" : "Add Dish"}
       </button>
     </div>

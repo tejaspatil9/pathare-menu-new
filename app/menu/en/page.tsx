@@ -22,7 +22,6 @@ interface Dish {
   is_chef_special: boolean;
   is_pathare_special: boolean;
   is_bestseller: boolean;
-  is_visible: boolean;
   category_id: string;
   display_order: number;
   dish_prices: {
@@ -34,30 +33,21 @@ interface Dish {
 export default function FoodMenuPage() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [dishes, setDishes] = useState<Dish[]>([]);
-  const [activeCategory, setActiveCategory] = useState("All");
+  const [activeCategory, setActiveCategory] = useState<string>("");
   const [search, setSearch] = useState("");
+  const [loading, setLoading] = useState(true);
 
-  // ✅ Fetch Categories (ordered)
   useEffect(() => {
-    const fetchCategories = async () => {
-      const { data } = await supabase
+    const fetchAll = async () => {
+      setLoading(true);
+
+      const { data: categoryData } = await supabase
         .from("categories")
         .select("id, name_en, display_order")
         .eq("restaurant_id", RESTAURANT_ID)
         .order("display_order", { ascending: true });
 
-      if (data) {
-        setCategories(data);
-      }
-    };
-
-    fetchCategories();
-  }, []);
-
-  // ✅ Fetch Dishes (ordered + visible only)
-  useEffect(() => {
-    const fetchDishes = async () => {
-      const { data } = await supabase
+      const { data: dishData } = await supabase
         .from("dishes")
         .select(`
           id,
@@ -68,7 +58,6 @@ export default function FoodMenuPage() {
           is_chef_special,
           is_pathare_special,
           is_bestseller,
-          is_visible,
           category_id,
           display_order,
           dish_prices (
@@ -80,22 +69,28 @@ export default function FoodMenuPage() {
         .eq("is_visible", true)
         .order("display_order", { ascending: true });
 
-      if (data) {
-        setDishes(data);
+      if (categoryData) {
+        setCategories(categoryData);
+        setActiveCategory(categoryData[0]?.name_en || "");
       }
+
+      if (dishData) {
+        setDishes(dishData);
+      }
+
+      setLoading(false);
     };
 
-    fetchDishes();
+    fetchAll();
   }, []);
 
-  // ✅ Filter Logic (preserves DB ordering)
   const filtered = dishes.filter((dish) => {
     const matchesSearch = dish.name_en
       .toLowerCase()
       .includes(search.toLowerCase());
 
     const matchesCategory =
-      activeCategory === "All" ||
+      !activeCategory ||
       categories.find((c) => c.id === dish.category_id)?.name_en ===
         activeCategory;
 
@@ -104,53 +99,57 @@ export default function FoodMenuPage() {
 
   return (
     <div className="min-h-screen bg-[#f3e6d3] px-4 pb-10">
-
-      {/* Sticky Header */}
       <div className="sticky top-0 z-40 bg-[#f3e6d3] pt-6 pb-4">
-
         <h1 className="text-2xl font-semibold text-[#5a1f1f] mb-4">
           Food Menu
         </h1>
 
-        <CategoryBar
-          categories={["All", ...categories.map((c) => c.name_en)]}
-          activeCategory={activeCategory}
-          setActiveCategory={setActiveCategory}
-        />
+        {categories.length > 0 && (
+          <CategoryBar
+            categories={categories.map((c) => c.name_en)}
+            activeCategory={activeCategory}
+            setActiveCategory={setActiveCategory}
+          />
+        )}
 
         <SearchBar value={search} onChange={setSearch} />
-
       </div>
 
-      {/* Dish List */}
       <div className="mt-6 flex flex-col gap-6">
+        {loading && (
+          <>
+            <div className="h-28 bg-gray-200 animate-pulse rounded" />
+            <div className="h-28 bg-gray-200 animate-pulse rounded" />
+            <div className="h-28 bg-gray-200 animate-pulse rounded" />
+          </>
+        )}
 
-        {filtered.length === 0 && (
+        {!loading && filtered.length === 0 && (
           <p className="text-center text-[#5a1f1f]/70">
             No dishes found
           </p>
         )}
 
-        {filtered.map((dish) => (
-          <DishCard
-            key={dish.id}
-            dish={{
-              id: dish.id,
-              name: dish.name_en,
-              description: dish.description_en || "",
-              image: dish.image_url || "",
-              isVeg: dish.is_veg,
-              isChefSpecial: dish.is_chef_special,
-              isPathareSpecial: dish.is_pathare_special,
-              isBestseller: dish.is_bestseller,
-              prices: dish.dish_prices.map((p) => ({
-                label: p.label_en,
-                price: p.price,
-              })),
-            }}
-          />
-        ))}
-
+        {!loading &&
+          filtered.map((dish) => (
+            <DishCard
+              key={dish.id}
+              dish={{
+                id: dish.id,
+                name: dish.name_en,
+                description: dish.description_en || "",
+                image: dish.image_url || "",
+                isVeg: dish.is_veg,
+                isChefSpecial: dish.is_chef_special,
+                isPathareSpecial: dish.is_pathare_special,
+                isBestseller: dish.is_bestseller,
+                prices: dish.dish_prices.map((p) => ({
+                  label: p.label_en,
+                  price: p.price,
+                })),
+              }}
+            />
+          ))}
       </div>
     </div>
   );

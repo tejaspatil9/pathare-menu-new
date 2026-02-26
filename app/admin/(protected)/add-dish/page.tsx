@@ -9,19 +9,30 @@ import DishList from "@/components/admin/DishList";
 import CategoryManager from "@/components/admin/CategoryManager";
 
 export default function AdminPage() {
-
   const [categories, setCategories] = useState<any[]>([]);
   const [dishes, setDishes] = useState<any[]>([]);
   const [editingDish, setEditingDish] = useState<any | null>(null);
+  const [loading, setLoading] = useState(false);
 
   const fetchData = async () => {
+    setLoading(true);
 
-    const { data: categoryData } = await supabase
+    /* ================= FETCH CATEGORIES ================= */
+
+    const { data: categoryData, error: categoryError } = await supabase
       .from("categories")
       .select("*")
-      .eq("restaurant_id", RESTAURANT_ID);
+      .eq("restaurant_id", RESTAURANT_ID)
+      .order("display_order", { ascending: true });
 
-    const { data: dishData } = await supabase
+    if (categoryError) {
+      console.error("Category fetch error:", categoryError);
+      alert(categoryError.message);
+    }
+
+    /* ================= FETCH DISHES ================= */
+
+    const { data: dishData, error: dishError } = await supabase
       .from("dishes")
       .select(`
         *,
@@ -33,10 +44,17 @@ export default function AdminPage() {
         )
       `)
       .eq("restaurant_id", RESTAURANT_ID)
-      .order("created_at", { ascending: false });
+      .order("display_order", { ascending: true });
+
+    if (dishError) {
+      console.error("Dish fetch error:", dishError);
+      alert(dishError.message);
+    }
 
     if (categoryData) setCategories(categoryData);
     if (dishData) setDishes(dishData);
+
+    setLoading(false);
   };
 
   useEffect(() => {
@@ -45,6 +63,10 @@ export default function AdminPage() {
 
   return (
     <div className="p-8 space-y-8 max-w-4xl">
+
+      {loading && (
+        <p className="text-sm text-gray-500">Loading...</p>
+      )}
 
       {/* Dish Form */}
       <DishForm

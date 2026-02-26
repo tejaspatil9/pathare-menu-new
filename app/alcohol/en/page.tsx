@@ -28,13 +28,14 @@ interface Alcohol {
 interface AlcoholCategory {
   id: string;
   name_en: string;
+  display_order: number;
 }
 
 export default function AlcoholMenuPage() {
   const [drinks, setDrinks] = useState<Alcohol[]>([]);
   const [categories, setCategories] = useState<AlcoholCategory[]>([]);
   const [search, setSearch] = useState("");
-  const [activeCategory, setActiveCategory] = useState("All");
+  const [activeCategory, setActiveCategory] = useState<string>("");
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -42,20 +43,27 @@ export default function AlcoholMenuPage() {
     fetchAlcohol();
   }, []);
 
+  /* ================= FETCH CATEGORIES (ORDERED) ================= */
+
   const fetchCategories = async () => {
     const { data, error } = await supabase
       .from("alcohol_categories")
-      .select("id, name_en")
+      .select("id, name_en, display_order")
       .eq("restaurant_id", RESTAURANT_ID)
-      .order("name_en", { ascending: true });
+      .order("display_order", { ascending: true }); // ✅ ORDER FIXED
 
     if (error) {
       console.error("Category fetch error:", error);
       return;
     }
 
-    setCategories(data || []);
+    if (data && data.length > 0) {
+      setCategories(data);
+      setActiveCategory(data[0].name_en); // auto select first
+    }
   };
+
+  /* ================= FETCH DRINKS ================= */
 
   const fetchAlcohol = async () => {
     setLoading(true);
@@ -78,8 +86,7 @@ export default function AlcoholMenuPage() {
         )
       `)
       .eq("restaurant_id", RESTAURANT_ID)
-      .eq("is_visible", true)
-      .order("created_at", { ascending: false });
+      .eq("is_visible", true);
 
     if (error) {
       console.error("Alcohol fetch error:", error);
@@ -91,6 +98,8 @@ export default function AlcoholMenuPage() {
     setLoading(false);
   };
 
+  /* ================= FILTER LOGIC ================= */
+
   const filteredDrinks = drinks.filter((drink) => {
     const matchesSearch =
       drink.name?.toLowerCase().includes(search.toLowerCase());
@@ -99,7 +108,6 @@ export default function AlcoholMenuPage() {
       categories.find((c) => c.id === drink.category_id)?.name_en;
 
     const matchesCategory =
-      activeCategory === "All" ||
       categoryName === activeCategory;
 
     return matchesSearch && matchesCategory;
@@ -108,26 +116,22 @@ export default function AlcoholMenuPage() {
   return (
     <div className="min-h-screen bg-[#f3e6d3] px-4 pb-10">
 
-      {/* Sticky Header */}
       <div className="sticky top-0 z-40 bg-[#f3e6d3] pt-6 pb-4">
-
         <h1 className="text-2xl font-semibold text-[#5a1f1f] mb-4">
           Alcohol Menu
         </h1>
 
-        <CategoryBar
-          categories={[
-            "All",
-            ...categories.map((c) => c.name_en),
-          ]}
-          activeCategory={activeCategory}
-          setActiveCategory={setActiveCategory}
-        />
+        {categories.length > 0 && (
+          <CategoryBar
+            categories={categories.map((c) => c.name_en)} // no "All"
+            activeCategory={activeCategory}
+            setActiveCategory={setActiveCategory}
+          />
+        )}
 
         <SearchBar value={search} onChange={setSearch} />
       </div>
 
-      {/* Drinks List */}
       <div className="mt-6 flex flex-col gap-6">
 
         {loading && (
@@ -162,6 +166,7 @@ export default function AlcoholMenuPage() {
               }}
             />
           ))}
+
       </div>
     </div>
   );
