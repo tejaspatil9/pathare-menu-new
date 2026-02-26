@@ -8,7 +8,6 @@ import SearchBar from "@/components/menu/SearchBar";
 import AlcoholCard from "@/components/alcohol/AlcoholCard";
 
 interface AlcoholPrice {
-  id: string;
   label: string;
   price: number;
 }
@@ -16,10 +15,8 @@ interface AlcoholPrice {
 interface Alcohol {
   id: string;
   name: string;
-  description: string | null;
   image_url: string | null;
   is_bestseller: boolean | null;
-  is_visible: boolean;
   is_image_visible: boolean | null;
   category_id: string;
   alcohol_prices: AlcoholPrice[] | null;
@@ -28,90 +25,69 @@ interface Alcohol {
 interface AlcoholCategory {
   id: string;
   name_en: string;
-  display_order: number;
 }
 
 export default function AlcoholMenuPage() {
-  const [drinks, setDrinks] = useState<Alcohol[]>([]);
   const [categories, setCategories] = useState<AlcoholCategory[]>([]);
+  const [activeCategoryId, setActiveCategoryId] = useState<string>("");
+  const [drinks, setDrinks] = useState<Alcohol[]>([]);
   const [search, setSearch] = useState("");
-  const [activeCategory, setActiveCategory] = useState<string>("");
   const [loading, setLoading] = useState(true);
 
+  /* ================= LOAD CATEGORIES ================= */
+
   useEffect(() => {
+    const fetchCategories = async () => {
+      const { data } = await supabase
+        .from("alcohol_categories")
+        .select("id, name_en")
+        .eq("restaurant_id", RESTAURANT_ID)
+        .order("display_order", { ascending: true });
+
+      if (data && data.length > 0) {
+        setCategories(data);
+        setActiveCategoryId(data[0].id);
+      }
+    };
+
     fetchCategories();
-    fetchAlcohol();
   }, []);
 
-  /* ================= FETCH CATEGORIES (ORDERED) ================= */
+  /* ================= LOAD DRINKS PER CATEGORY ================= */
 
-  const fetchCategories = async () => {
-    const { data, error } = await supabase
-      .from("alcohol_categories")
-      .select("id, name_en, display_order")
-      .eq("restaurant_id", RESTAURANT_ID)
-      .order("display_order", { ascending: true }); // ✅ ORDER FIXED
+  useEffect(() => {
+    if (!activeCategoryId) return;
 
-    if (error) {
-      console.error("Category fetch error:", error);
-      return;
-    }
+    const fetchAlcohol = async () => {
+      setLoading(true);
 
-    if (data && data.length > 0) {
-      setCategories(data);
-      setActiveCategory(data[0].name_en); // auto select first
-    }
-  };
-
-  /* ================= FETCH DRINKS ================= */
-
-  const fetchAlcohol = async () => {
-    setLoading(true);
-
-    const { data, error } = await supabase
-      .from("alcohol")
-      .select(`
-        id,
-        name,
-        description,
-        image_url,
-        is_bestseller,
-        is_visible,
-        is_image_visible,
-        category_id,
-        alcohol_prices (
+      const { data } = await supabase
+        .from("alcohol")
+        .select(`
           id,
-          label,
-          price
-        )
-      `)
-      .eq("restaurant_id", RESTAURANT_ID)
-      .eq("is_visible", true);
+          name,
+          image_url,
+          is_bestseller,
+          is_image_visible,
+          category_id,
+          alcohol_prices(label, price)
+        `)
+        .eq("restaurant_id", RESTAURANT_ID)
+        .eq("category_id", activeCategoryId)
+        .eq("is_visible", true);
 
-    if (error) {
-      console.error("Alcohol fetch error:", error);
+      setDrinks(data || []);
       setLoading(false);
-      return;
-    }
+    };
 
-    setDrinks((data || []) as Alcohol[]);
-    setLoading(false);
-  };
+    fetchAlcohol();
+  }, [activeCategoryId]);
 
-  /* ================= FILTER LOGIC ================= */
+  /* ================= SEARCH FILTER ================= */
 
-  const filteredDrinks = drinks.filter((drink) => {
-    const matchesSearch =
-      drink.name?.toLowerCase().includes(search.toLowerCase());
-
-    const categoryName =
-      categories.find((c) => c.id === drink.category_id)?.name_en;
-
-    const matchesCategory =
-      categoryName === activeCategory;
-
-    return matchesSearch && matchesCategory;
-  });
+  const filteredDrinks = drinks.filter((drink) =>
+    drink.name?.toLowerCase().includes(search.toLowerCase())
+  );
 
   return (
     <div className="min-h-screen bg-[#f3e6d3] px-4 pb-10">
@@ -123,9 +99,14 @@ export default function AlcoholMenuPage() {
 
         {categories.length > 0 && (
           <CategoryBar
-            categories={categories.map((c) => c.name_en)} // no "All"
-            activeCategory={activeCategory}
-            setActiveCategory={setActiveCategory}
+            categories={categories.map((c) => c.name_en)}
+            activeCategory={
+              categories.find((c) => c.id === activeCategoryId)?.name_en || ""
+            }
+            setActiveCategory={(name) => {
+              const found = categories.find((c) => c.name_en === name);
+              if (found) setActiveCategoryId(found.id);
+            }}
           />
         )}
 
@@ -153,7 +134,7 @@ export default function AlcoholMenuPage() {
               drink={{
                 id: drink.id,
                 name: drink.name,
-                description: drink.description || "",
+                description: "",
                 image: drink.is_image_visible
                   ? drink.image_url || ""
                   : "",

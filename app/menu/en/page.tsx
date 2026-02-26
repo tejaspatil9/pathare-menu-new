@@ -10,20 +10,17 @@ import DishCard from "@/components/menu/DishCard";
 interface Category {
   id: string;
   name_en: string;
-  display_order: number;
 }
 
 interface Dish {
   id: string;
   name_en: string;
-  description_en: string | null;
   image_url: string | null;
   is_veg: boolean;
   is_chef_special: boolean;
   is_pathare_special: boolean;
   is_bestseller: boolean;
   category_id: string;
-  display_order: number;
   dish_prices: {
     label_en: string;
     price: number;
@@ -32,70 +29,68 @@ interface Dish {
 
 export default function FoodMenuPage() {
   const [categories, setCategories] = useState<Category[]>([]);
+  const [activeCategoryId, setActiveCategoryId] = useState<string>("");
   const [dishes, setDishes] = useState<Dish[]>([]);
-  const [activeCategory, setActiveCategory] = useState<string>("");
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    const fetchAll = async () => {
-      setLoading(true);
+  /* ================= LOAD CATEGORIES ONCE ================= */
 
-      const { data: categoryData } = await supabase
+  useEffect(() => {
+    const fetchCategories = async () => {
+      const { data } = await supabase
         .from("categories")
-        .select("id, name_en, display_order")
+        .select("id, name_en")
         .eq("restaurant_id", RESTAURANT_ID)
         .order("display_order", { ascending: true });
 
-      const { data: dishData } = await supabase
+      if (data && data.length > 0) {
+        setCategories(data);
+        setActiveCategoryId(data[0].id);
+      }
+    };
+
+    fetchCategories();
+  }, []);
+
+  /* ================= LOAD DISHES PER CATEGORY ================= */
+
+  useEffect(() => {
+    if (!activeCategoryId) return;
+
+    const fetchDishes = async () => {
+      setLoading(true);
+
+      const { data } = await supabase
         .from("dishes")
         .select(`
           id,
           name_en,
-          description_en,
           image_url,
           is_veg,
           is_chef_special,
           is_pathare_special,
           is_bestseller,
           category_id,
-          display_order,
-          dish_prices (
-            label_en,
-            price
-          )
+          dish_prices(label_en, price)
         `)
         .eq("restaurant_id", RESTAURANT_ID)
+        .eq("category_id", activeCategoryId)
         .eq("is_visible", true)
         .order("display_order", { ascending: true });
 
-      if (categoryData) {
-        setCategories(categoryData);
-        setActiveCategory(categoryData[0]?.name_en || "");
-      }
-
-      if (dishData) {
-        setDishes(dishData);
-      }
-
+      setDishes(data || []);
       setLoading(false);
     };
 
-    fetchAll();
-  }, []);
+    fetchDishes();
+  }, [activeCategoryId]);
 
-  const filtered = dishes.filter((dish) => {
-    const matchesSearch = dish.name_en
-      .toLowerCase()
-      .includes(search.toLowerCase());
+  /* ================= SEARCH FILTER ================= */
 
-    const matchesCategory =
-      !activeCategory ||
-      categories.find((c) => c.id === dish.category_id)?.name_en ===
-        activeCategory;
-
-    return matchesSearch && matchesCategory;
-  });
+  const filtered = dishes.filter((dish) =>
+    dish.name_en.toLowerCase().includes(search.toLowerCase())
+  );
 
   return (
     <div className="min-h-screen bg-[#f3e6d3] px-4 pb-10">
@@ -107,8 +102,13 @@ export default function FoodMenuPage() {
         {categories.length > 0 && (
           <CategoryBar
             categories={categories.map((c) => c.name_en)}
-            activeCategory={activeCategory}
-            setActiveCategory={setActiveCategory}
+            activeCategory={
+              categories.find((c) => c.id === activeCategoryId)?.name_en || ""
+            }
+            setActiveCategory={(name) => {
+              const found = categories.find((c) => c.name_en === name);
+              if (found) setActiveCategoryId(found.id);
+            }}
           />
         )}
 
@@ -118,7 +118,6 @@ export default function FoodMenuPage() {
       <div className="mt-6 flex flex-col gap-6">
         {loading && (
           <>
-            <div className="h-28 bg-gray-200 animate-pulse rounded" />
             <div className="h-28 bg-gray-200 animate-pulse rounded" />
             <div className="h-28 bg-gray-200 animate-pulse rounded" />
           </>
@@ -137,7 +136,7 @@ export default function FoodMenuPage() {
               dish={{
                 id: dish.id,
                 name: dish.name_en,
-                description: dish.description_en || "",
+                description: "",
                 image: dish.image_url || "",
                 isVeg: dish.is_veg,
                 isChefSpecial: dish.is_chef_special,
