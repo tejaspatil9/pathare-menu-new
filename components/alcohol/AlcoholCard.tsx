@@ -18,6 +18,7 @@ interface Drink {
 
 export default function AlcoholCard({ drink }: { drink: Drink }) {
   const [openImage, setOpenImage] = useState(false);
+  const [imageLoaded, setImageLoaded] = useState(false);
 
   const prices = (drink.prices || []).filter(
     (p) => p.price !== null && Number(p.price) > 0
@@ -32,16 +33,26 @@ export default function AlcoholCard({ drink }: { drink: Drink }) {
       <div className="border-b border-[#5a1f1f]/10 py-4">
         <div className="flex gap-3">
 
-          {/* Image */}
+          {/* IMAGE */}
           {drink.image && drink.image.trim() !== "" && (
             <div
-              className="w-20 h-20 rounded-xl overflow-hidden flex-shrink-0 cursor-pointer"
+              className="relative w-20 h-20 rounded-xl overflow-hidden flex-shrink-0 cursor-pointer bg-gray-200"
               onClick={() => setOpenImage(true)}
             >
+              {/* Skeleton */}
+              {!imageLoaded && (
+                <div className="absolute inset-0 animate-pulse bg-gray-300" />
+              )}
+
               <img
                 src={drink.image}
                 alt={drink.name}
-                className="w-full h-full object-cover"
+                loading="lazy"
+                decoding="async"
+                onLoad={() => setImageLoaded(true)}
+                className={`w-full h-full object-cover transition-opacity duration-300 ${
+                  imageLoaded ? "opacity-100" : "opacity-0"
+                }`}
               />
             </div>
           )}
@@ -62,7 +73,7 @@ export default function AlcoholCard({ drink }: { drink: Drink }) {
             </div>
 
             {/* Description */}
-            {drink.description && drink.description.trim() !== "" && (
+            {drink.description?.trim() && (
               <p className="text-xs text-[#6b4b3e] mt-1 leading-snug">
                 {drink.description}
               </p>
@@ -85,13 +96,12 @@ export default function AlcoholCard({ drink }: { drink: Drink }) {
                 )}
               </div>
             )}
-
           </div>
         </div>
       </div>
 
-      {/* 🔥 Image Modal */}
-      {openImage && (
+      {/* FULLSCREEN MODAL */}
+      {openImage && drink.image && (
         <div
           className="fixed inset-0 bg-black/70 flex items-center justify-center z-50"
           onClick={() => setOpenImage(false)}
@@ -100,6 +110,7 @@ export default function AlcoholCard({ drink }: { drink: Drink }) {
             <img
               src={drink.image}
               alt={drink.name}
+              loading="lazy"
               className="w-full rounded-2xl shadow-xl"
             />
           </div>
