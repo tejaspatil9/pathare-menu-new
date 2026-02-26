@@ -115,6 +115,8 @@ export default function DishForm({
 
     let imageUrl = existingImage;
 
+    /* ================= IMAGE UPLOAD ================= */
+
     if (file) {
       const formData = new FormData();
       formData.append("file", file);
@@ -137,6 +139,8 @@ export default function DishForm({
 
     let dishId = editingDish?.id;
 
+    /* ================= UPDATE MODE ================= */
+
     if (editingDish) {
       const { error } = await supabase
         .from("dishes")
@@ -152,13 +156,30 @@ export default function DishForm({
           is_pathare_special: isPathareSpecial,
           is_bestseller: isBestseller,
         })
-        .eq("id", dishId);
+        .eq("id", dishId)
+        .eq("restaurant_id", RESTAURANT_ID);
 
       if (error) {
         alert(error.message);
         return;
       }
-    } else {
+    } 
+
+    /* ================= INSERT MODE ================= */
+
+    else {
+      // Get current max display_order inside this category
+      const { data: existing } = await supabase
+        .from("dishes")
+        .select("display_order")
+        .eq("restaurant_id", RESTAURANT_ID)
+        .eq("category_id", category);
+
+      const maxOrder =
+        existing && existing.length > 0
+          ? Math.max(...existing.map((d) => d.display_order ?? 0))
+          : 0;
+
       const { data, error } = await supabase
         .from("dishes")
         .insert([
@@ -175,6 +196,7 @@ export default function DishForm({
             is_pathare_special: isPathareSpecial,
             is_bestseller: isBestseller,
             is_visible: true,
+            display_order: maxOrder + 1,
           },
         ])
         .select()
@@ -219,29 +241,36 @@ export default function DishForm({
         {editingDish ? "Edit Dish" : "Add Dish"}
       </h2>
 
-      <input placeholder="Name EN" value={nameEn}
+      <input
+        placeholder="Name EN"
+        value={nameEn}
         onChange={(e) => setNameEn(e.target.value)}
         className="border p-2 w-full"
       />
 
-      <input placeholder="Name MR" value={nameMr}
+      <input
+        placeholder="Name MR"
+        value={nameMr}
         onChange={(e) => setNameMr(e.target.value)}
         className="border p-2 w-full"
       />
 
-      <textarea placeholder="Description EN"
+      <textarea
+        placeholder="Description EN"
         value={descriptionEn}
         onChange={(e) => setDescriptionEn(e.target.value)}
         className="border p-2 w-full"
       />
 
-      <textarea placeholder="Description MR"
+      <textarea
+        placeholder="Description MR"
         value={descriptionMr}
         onChange={(e) => setDescriptionMr(e.target.value)}
         className="border p-2 w-full"
       />
 
-      <select value={category}
+      <select
+        value={category}
         onChange={(e) => setCategory(e.target.value)}
         className="border p-2 w-full"
       >
@@ -254,77 +283,95 @@ export default function DishForm({
       </select>
 
       {existingImage && (
-        <img src={existingImage} alt="Preview"
+        <img
+          src={existingImage}
+          alt="Preview"
           className="w-24 h-24 object-cover rounded border"
         />
       )}
 
       <input type="file" onChange={handleFileChange} />
 
-      {/* TAGS */}
       <div className="grid grid-cols-2 gap-3 text-sm">
-        <label><input type="checkbox" checked={isVeg}
-          onChange={(e)=>setIsVeg(e.target.checked)} /> Veg</label>
-        <label><input type="checkbox" checked={isChefSpecial}
-          onChange={(e)=>setIsChefSpecial(e.target.checked)} /> Chef Special</label>
-        <label><input type="checkbox" checked={isPathareSpecial}
-          onChange={(e)=>setIsPathareSpecial(e.target.checked)} /> Pathare Special</label>
-        <label><input type="checkbox" checked={isBestseller}
-          onChange={(e)=>setIsBestseller(e.target.checked)} /> Bestseller</label>
+        <label>
+          <input type="checkbox" checked={isVeg}
+            onChange={(e) => setIsVeg(e.target.checked)} /> Veg
+        </label>
+        <label>
+          <input type="checkbox" checked={isChefSpecial}
+            onChange={(e) => setIsChefSpecial(e.target.checked)} /> Chef Special
+        </label>
+        <label>
+          <input type="checkbox" checked={isPathareSpecial}
+            onChange={(e) => setIsPathareSpecial(e.target.checked)} /> Pathare Special
+        </label>
+        <label>
+          <input type="checkbox" checked={isBestseller}
+            onChange={(e) => setIsBestseller(e.target.checked)} /> Bestseller
+        </label>
       </div>
 
-      {/* PRICES */}
       <div className="border p-3 rounded-md space-y-2">
         <h3 className="text-sm font-medium">Prices</h3>
 
         {prices.map((p, i) => (
           <div key={i} className="flex gap-2 items-center">
-            <input placeholder="Label EN"
+            <input
+              placeholder="Label EN"
               value={p.label_en}
-              onChange={(e)=>{
-                const updated=[...prices];
-                updated[i].label_en=e.target.value;
+              onChange={(e) => {
+                const updated = [...prices];
+                updated[i].label_en = e.target.value;
                 setPrices(updated);
               }}
               className="border p-2 flex-1"
             />
-            <input placeholder="Label MR"
+            <input
+              placeholder="Label MR"
               value={p.label_mr}
-              onChange={(e)=>{
-                const updated=[...prices];
-                updated[i].label_mr=e.target.value;
+              onChange={(e) => {
+                const updated = [...prices];
+                updated[i].label_mr = e.target.value;
                 setPrices(updated);
               }}
               className="border p-2 flex-1"
             />
-            <input type="number"
+            <input
+              type="number"
               value={p.price}
-              onChange={(e)=>{
-                const updated=[...prices];
-                updated[i].price=Number(e.target.value);
+              onChange={(e) => {
+                const updated = [...prices];
+                updated[i].price = Number(e.target.value);
                 setPrices(updated);
               }}
               className="border p-2 w-24"
             />
             {prices.length > 1 && (
-              <button type="button"
-                onClick={()=>setPrices(prices.filter((_,idx)=>idx!==i))}
+              <button
+                type="button"
+                onClick={() =>
+                  setPrices(prices.filter((_, idx) => idx !== i))
+                }
                 className="text-red-500"
-              >✕</button>
+              >
+                ✕
+              </button>
             )}
           </div>
         ))}
 
-        <button type="button"
-          onClick={()=>setPrices([...prices,{label_en:"",label_mr:"",price:0}])}
+        <button
+          type="button"
+          onClick={() =>
+            setPrices([...prices, { label_en: "", label_mr: "", price: 0 }])
+          }
           className="text-blue-600 text-sm"
         >
           + Add Price
         </button>
       </div>
 
-      <button onClick={handleSubmit}
-        className="border p-2 w-full">
+      <button onClick={handleSubmit} className="border p-2 w-full">
         {editingDish ? "Update Dish" : "Add Dish"}
       </button>
     </div>
